@@ -1,16 +1,18 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 
+const backend = 'http://127.0.0.1:8080'
+
 export default defineConfig({
   plugins: [react()],
 server: {
     proxy: {
-      '/balloon': 'http://localhost:8080',
-      '/balloons': 'http://localhost:8080',
-      '/status': 'http://localhost:8080',
-      '/weather': 'http://localhost:8080',
-      '/atmosphere': 'http://localhost:8080',
-      '/sdr': 'http://localhost:8080',
+      '/balloon': backend,
+      '/balloons': backend,
+      '/status': backend,
+      '/weather': backend,
+      '/atmosphere': backend,
+      '/sdr': backend,
     },
   },
 })
