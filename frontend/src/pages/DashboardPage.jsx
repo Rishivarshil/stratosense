@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import Globe from '../components/Globe';
 import AltitudeColumn from '../components/AltitudeColumn';
 import FlightScrubber from '../components/FlightScrubber';
+import StationScrubber from '../components/StationScrubber';
 import SoundingChart from '../components/SoundingChart';
 import WindBarbs from '../components/WindBarbs';
 import ScoreCard from '../components/ScoreCard';
@@ -24,6 +25,9 @@ export default function DashboardPage() {
   const [flightFrames, setFlightFrames] = useState(null);
   const [scrubIndex, setScrubIndex] = useState(0);
   const [analysis, setAnalysis] = useState(null);
+  const [stationHybrid, setStationHybrid] = useState(null);
+  const [stationTimeIndex, setStationTimeIndex] = useState(0);
+  const [stationHeightIndex, setStationHeightIndex] = useState(0);
   const activeSerial = activeSource === 'balloon' ? activeId : null;
 
   useEffect(() => {
@@ -93,6 +97,52 @@ export default function DashboardPage() {
     };
   }, [activeSerial, loadFlightData]);
 
+  useEffect(() => {
+    let cancelled = false;
+    async function loadStationHybrid(stid) {
+      if (!stid) {
+        setStationHybrid(null);
+        setStationTimeIndex(0);
+        setStationHeightIndex(0);
+        return;
+      }
+      try {
+        const res = await fetch(`/station/${stid}/hybrid`);
+        if (!res.ok) throw new Error(`Station hybrid fetch failed: ${res.status}`);
+        const data = await res.json();
+        if (cancelled) return;
+        setStationHybrid(data);
+        const latest = Math.max(0, (data.snapshots?.length ?? 1) - 1);
+        setStationTimeIndex(latest);
+        setStationHeightIndex(0);
+      } catch {
+        if (!cancelled) {
+          setStationHybrid(null);
+          setStationTimeIndex(0);
+          setStationHeightIndex(0);
+        }
+      }
+    }
+
+    if (activeSource === 'station' && activeId) {
+      loadStationHybrid(activeId);
+    } else {
+      setStationHybrid(null);
+      setStationTimeIndex(0);
+      setStationHeightIndex(0);
+    }
+    return () => {
+      cancelled = true;
+    };
+  }, [activeSource, activeId]);
+
+  useEffect(() => {
+    const levels = stationHybrid?.snapshots?.[stationTimeIndex]?.levels ?? [];
+    if (stationHeightIndex > Math.max(0, levels.length - 1)) {
+      setStationHeightIndex(Math.max(0, levels.length - 1));
+    }
+  }, [stationHybrid, stationTimeIndex, stationHeightIndex]);
+
   function handleLoad(e) {
     e.preventDefault();
     const trimmed = serialInput.trim();
@@ -104,6 +154,16 @@ export default function DashboardPage() {
 
   const online = serverStatus?.status === 'running';
   const scrubFrame = flightFrames?.[scrubIndex] ?? null;
+  const stationSnapshot = stationHybrid?.snapshots?.[stationTimeIndex] ?? null;
+  const stationFrames3d = (stationSnapshot?.levels || []).map((lv) => ({
+    lat: lv.lat,
+    lon: lv.lon,
+    alt: lv.alt,
+    temp: lv.temp,
+    humidity: lv.humidity,
+    datetime: lv.datetime,
+    vel_v: null,
+  }));
 
   return (
     <div className="app dashboard-page">
@@ -136,12 +196,28 @@ export default function DashboardPage() {
 
       <div className="app-body">
         <div className="left-panel">
-          <Globe selectedSerial={activeSerial} scrubFrame={scrubFrame} />
-          <FlightScrubber
-            frames={flightFrames}
-            scrubIndex={scrubIndex}
-            onChange={setScrubIndex}
-          />
+          {activeSource === 'balloon' ? (
+            <>
+              <Globe selectedSerial={activeSerial} scrubFrame={scrubFrame} />
+              <FlightScrubber
+                frames={flightFrames}
+                scrubIndex={scrubIndex}
+                onChange={setScrubIndex}
+              />
+            </>
+          ) : (
+            <>
+              <Globe selectedSerial={null} scrubFrame={null} />
+              <StationScrubber
+                stationId={activeId}
+                snapshots={stationHybrid?.snapshots || []}
+                timeIndex={stationTimeIndex}
+                onTimeChange={setStationTimeIndex}
+                heightIndex={stationHeightIndex}
+                onHeightChange={setStationHeightIndex}
+              />
+            </>
+          )}
         </div>
 
         <div className="right-panel">
@@ -188,10 +264,10 @@ export default function DashboardPage() {
               style={{ display: activeTab === '3d' ? 'flex' : 'none' }}
             >
               <AltitudeColumn
-                frames={flightFrames}
-                scrubIndex={scrubIndex}
-                analysis={analysis}
-                serial={activeSerial}
+                frames={activeSource === 'station' ? stationFrames3d : flightFrames}
+                scrubIndex={activeSource === 'station' ? stationHeightIndex : scrubIndex}
+                analysis={activeSource === 'station' ? stationSnapshot?.analysis ?? null : analysis}
+                serial={activeSource === 'station' ? activeId : activeSerial}
               />
             </div>
 
@@ -199,21 +275,36 @@ export default function DashboardPage() {
               className="tab-panel"
               style={{ display: activeTab === 'sounding' ? 'block' : 'none' }}
             >
-              <SoundingChart source={activeSource} id={activeId} />
+              <SoundingChart
+                source={activeSource}
+                id={activeId}
+                stationTimeIndex={stationTimeIndex}
+                stationHeightIndex={stationHeightIndex}
+              />
             </div>
 
             <div
               className="tab-panel"
               style={{ display: activeTab === 'wind' ? 'block' : 'none' }}
             >
-              <WindBarbs serial={activeSerial} />
+              <WindBarbs
+                source={activeSource}
+                id={activeId}
+                serial={activeSerial}
+                stationTimeIndex={stationTimeIndex}
+              />
             </div>
 
             <div
               className="tab-panel"
               style={{ display: activeTab === 'score' ? 'block' : 'none' }}
             >
-              <ScoreCard serial={activeSerial} />
+              <ScoreCard
+                source={activeSource}
+                id={activeId}
+                serial={activeSerial}
+                stationTimeIndex={stationTimeIndex}
+              />
             </div>
           </div>
         </div>

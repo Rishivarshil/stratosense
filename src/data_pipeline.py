@@ -8,6 +8,7 @@ import threading
 import time
 import os
 from dotenv import load_dotenv
+from interpolation import generate_full_profile
 
 # Auto-load environment variables from .env in repository root
 load_dotenv()
@@ -190,6 +191,140 @@ def estimate_relative_humidity(temp_c, dewpoint_c):
         return max(0.0, min(100.0, round(rh, 2)))
     except Exception:
         return None
+
+
+def _build_station_hybrid_dataset(stid: str, recent_minutes: int = 180):
+    raw = fetch_station_timeseries(stid, recent_minutes=recent_minutes)
+    if not raw:
+        return None, "No weather data found for station"
+
+    parsed = parse_timeseries_for_assimilation(raw)
+    if not parsed:
+        return None, "No parsed observations found for station"
+
+    station = (raw.get('STATION') or [{}])[0]
+    lat = station.get('LATITUDE')
+    lon = station.get('LONGITUDE')
+
+    snapshots = []
+    for obs in parsed:
+        temp_c = obs.get('temp_c')
+        elev_m = obs.get('elev_m')
+        if temp_c is None or elev_m is None:
+            continue
+
+        dewpoint_c = obs.get('dewpoint_c')
+        pressure_hpa = obs.get('pressure_hpa')
+        wind_speed_ms = obs.get('wind_speed_ms')
+        wind_dir_deg = obs.get('wind_dir_deg')
+
+        surface = {
+            'temp_c': temp_c,
+            'dewpoint_c': dewpoint_c if dewpoint_c is not None else temp_c - 4.0,
+            'pressure_hpa': pressure_hpa if pressure_hpa is not None else 1013.25,
+            'elev_m': elev_m,
+            'wind_speed_ms': wind_speed_ms if wind_speed_ms is not None else 2.0,
+            'wind_dir_deg': wind_dir_deg if wind_dir_deg is not None else 180.0,
+            'elr': 6.5,
+            'dewpoint_lapse': 2.0,
+        }
+        profile = generate_full_profile(surface, max_alt=20000, step=500)
+        levels = []
+        for p in profile:
+            levels.append({
+                'lat': lat,
+                'lon': lon,
+                'alt': p.get('altitude_m'),
+                'temp': p.get('temp_c'),
+                'pressure_hpa': p.get('pressure_hpa'),
+                'humidity': p.get('humidity_pct'),
+                'dewpoint': p.get('dewpoint_c'),
+                'datetime': obs.get('datetime_utc'),
+                'wind_speed_ms': (p.get('wind') or {}).get('speed_ms'),
+                'wind_dir_deg': (p.get('wind') or {}).get('direction_deg'),
+                'source': p.get('source', 'interpolated'),
+            })
+
+        if not levels:
+            continue
+
+        frame_like = [
+            {
+                "alt": lv["alt"],
+                "temp": lv["temp"],
+                "humidity": lv["humidity"],
+                "datetime": lv["datetime"],
+            }
+            for lv in levels
+            if lv["alt"] is not None and lv["temp"] is not None
+        ]
+
+        lapse = calc_lapse_rate(frame_like)
+        tropo = find_tropopause(frame_like)
+        cape, cin, risk = calc_cape_cin(frame_like)
+        pw = calc_precipitable_water(frame_like)
+
+        wind_profile = []
+        for lv in levels:
+            ws = lv.get("wind_speed_ms")
+            wd = lv.get("wind_dir_deg")
+            alt = lv.get("alt")
+            if ws is None or wd is None or alt is None:
+                continue
+            wind_profile.append({
+                "alt": alt,
+                "speed_ms": round(float(ws), 2),
+                "speed_knots": round(float(ws) * 1.94384, 1),
+                "direction_deg": round(float(wd), 1),
+            })
+
+        analysis = {
+            "serial": stid,
+            "frame_count": len(frame_like),
+            "lapse_rate_c_per_km": lapse,
+            "tropopause_alt_m": tropo,
+            "tropopause_alt_km": round(tropo / 1000, 1) if tropo else None,
+            "cape": cape,
+            "cin": cin,
+            "storm_risk": risk,
+            "precipitable_water_mm": pw,
+            "wind_profile": wind_profile,
+            "surface_temp": temp_c,
+            "max_alt": max((lv.get("alt") or 0) for lv in levels),
+            "sonde_type": "synoptic_station_hybrid",
+            "snapshot_time": obs.get('datetime_utc'),
+        }
+
+        snapshots.append({
+            "datetime": obs.get('datetime_utc'),
+            "observed_surface": obs,
+            "levels": levels,
+            "analysis": analysis,
+        })
+
+    if not snapshots:
+        return None, "No valid station snapshots generated"
+
+    return {
+        "serial": stid,
+        "lat": lat,
+        "lon": lon,
+        "times": [s["datetime"] for s in snapshots],
+        "snapshots": snapshots,
+        "snapshot_count": len(snapshots),
+        "source": "synoptic_station_hybrid",
+    }, None
+
+
+def _select_snapshot(hybrid_data, time_index):
+    snapshots = hybrid_data.get("snapshots") or []
+    if not snapshots:
+        return None, -1
+    idx = time_index
+    if idx is None:
+        idx = len(snapshots) - 1
+    idx = max(0, min(int(idx), len(snapshots) - 1))
+    return snapshots[idx], idx
 
 # ─── SONDEHUB FETCH ──────────────────────────────────────────────────────────
 def fetch_all_balloons():
@@ -705,39 +840,23 @@ def get_station_profile(stid):
     if not SYNOPTIC_TOKEN:
         return jsonify({"error": "Synoptic Data not configured. Set SYNOPTIC_TOKEN environment variable."}), 503
 
-    raw = fetch_station_timeseries(stid, recent_minutes=180)
-    if not raw:
-        return jsonify({"error": "No weather data found for station"}), 404
-
-    parsed = parse_timeseries_for_assimilation(raw)
-    station = (raw.get('STATION') or [{}])[0]
-    lat = station.get('LATITUDE')
-    lon = station.get('LONGITUDE')
-
-    path = []
-    for obs in parsed:
-        temp_c = obs.get('temp_c')
-        elev_m = obs.get('elev_m')
-        if temp_c is None or elev_m is None:
-            continue
-        path.append({
-            "lat": lat,
-            "lon": lon,
-            "alt": elev_m,
-            "temp": temp_c,
-            "humidity": estimate_relative_humidity(temp_c, obs.get('dewpoint_c')),
-            "datetime": obs.get('datetime_utc'),
-            "vel_v": None,
-        })
-
-    if not path:
-        return jsonify({"error": "No valid station profile points"}), 404
+    recent = request.args.get('recent', default=180, type=int)
+    time_index = request.args.get('time_index', default=None, type=int)
+    hybrid, err = _build_station_hybrid_dataset(stid, recent_minutes=recent)
+    if not hybrid:
+        return jsonify({"error": err}), 404
+    snapshot, idx = _select_snapshot(hybrid, time_index)
+    if snapshot is None:
+        return jsonify({"error": "No station snapshots available"}), 404
 
     return jsonify({
         "serial": stid,
-        "point_count": len(path),
-        "path": path,
-        "source": "synoptic_station",
+        "point_count": len(snapshot["levels"]),
+        "path": snapshot["levels"],
+        "source": "synoptic_station_hybrid",
+        "selected_time_index": idx,
+        "selected_time": snapshot["datetime"],
+        "times": hybrid["times"],
     })
 
 
@@ -746,21 +865,33 @@ def get_station_analysis(stid):
     if not SYNOPTIC_TOKEN:
         return jsonify({"error": "Synoptic Data not configured. Set SYNOPTIC_TOKEN environment variable."}), 503
 
-    return jsonify({
-        "serial": stid,
-        "frame_count": 0,
-        "lapse_rate_c_per_km": None,
-        "tropopause_alt_m": None,
-        "tropopause_alt_km": None,
-        "cape": None,
-        "cin": None,
-        "storm_risk": "not_applicable_surface_station",
-        "precipitable_water_mm": None,
-        "wind_profile": [],
-        "surface_temp": None,
-        "max_alt": None,
-        "sonde_type": "synoptic_station",
-    })
+    recent = request.args.get('recent', default=180, type=int)
+    time_index = request.args.get('time_index', default=None, type=int)
+    hybrid, err = _build_station_hybrid_dataset(stid, recent_minutes=recent)
+    if not hybrid:
+        return jsonify({"error": err}), 404
+    snapshot, idx = _select_snapshot(hybrid, time_index)
+    if snapshot is None:
+        return jsonify({"error": "No station snapshots available"}), 404
+
+    analysis = dict(snapshot["analysis"])
+    analysis["selected_time_index"] = idx
+    analysis["selected_time"] = snapshot["datetime"]
+    analysis["times"] = hybrid["times"]
+    return jsonify(analysis)
+
+
+@app.route("/station/<stid>/hybrid")
+def get_station_hybrid(stid):
+    if not SYNOPTIC_TOKEN:
+        return jsonify({"error": "Synoptic Data not configured. Set SYNOPTIC_TOKEN environment variable."}), 503
+
+    recent = request.args.get('recent', default=180, type=int)
+    hybrid, err = _build_station_hybrid_dataset(stid, recent_minutes=recent)
+    if not hybrid:
+        return jsonify({"error": err}), 404
+
+    return jsonify(hybrid)
 
 
 @app.route("/status")

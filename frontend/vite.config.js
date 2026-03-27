@@ -9,6 +9,7 @@ server: {
     proxy: {
       '/balloon': backend,
       '/balloons': backend,
+      '/station': backend,
       '/status': backend,
       '/weather': backend,
       '/atmosphere': backend,

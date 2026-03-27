@@ -97,14 +97,16 @@ function WindBarbSVG({ speedKnots, directionDeg, size = 56 }) {
   );
 }
 
-export default function WindBarbs({ serial }) {
+export default function WindBarbs({ source = 'balloon', serial = null, id = null, stationTimeIndex = 0 }) {
+  const selectedId = id ?? serial;
+  const isStation = source === 'station';
   const [bands, setBands] = useState(null);
   const [status, setStatus] = useState('idle');
   const [error, setError] = useState(null);
   const pollRef = useRef(null);
 
   useEffect(() => {
-    if (!serial) {
+    if (!selectedId) {
       setBands(null);
       setStatus('idle');
       return;
@@ -114,7 +116,11 @@ export default function WindBarbs({ serial }) {
 
     async function fetchAndGroup() {
       try {
-        const res = await fetch(`/balloon/${serial}/analysis`);
+        const res = await fetch(
+          isStation
+            ? `/station/${selectedId}/analysis?time_index=${stationTimeIndex}`
+            : `/balloon/${selectedId}/analysis`
+        );
         if (!res.ok) throw new Error(`Analysis fetch failed: ${res.status}`);
         if (cancelled) return;
 
@@ -128,7 +134,7 @@ export default function WindBarbs({ serial }) {
         const grouped = groupIntoBands(profile);
         if (!cancelled) {
           setBands(grouped);
-          setStatus('live');
+          setStatus(isStation ? 'done' : 'live');
         }
       } catch (err) {
         if (!cancelled) {
@@ -148,7 +154,7 @@ export default function WindBarbs({ serial }) {
     }
 
     fetchAndGroup().then(() => {
-      if (!cancelled) {
+      if (!cancelled && !isStation) {
         pollRef.current = setInterval(() => {
           if (!cancelled) fetchAndGroup();
         }, LIVE_POLL_MS);
@@ -162,13 +168,13 @@ export default function WindBarbs({ serial }) {
         pollRef.current = null;
       }
     };
-  }, [serial]);
+  }, [selectedId, isStation, stationTimeIndex]);
 
   return (
     <div className="wind-barbs-container">
       <div className="chart-header">
         <h2>Wind Profile</h2>
-        {serial && <span className="serial-tag">{serial}</span>}
+        {selectedId && <span className="serial-tag">{selectedId}{isStation ? ' (station)' : ''}</span>}
         {status === 'live' && <span className="live-badge">Live</span>}
       </div>
 
@@ -185,9 +191,9 @@ export default function WindBarbs({ serial }) {
         </div>
       )}
 
-      {status === 'idle' && !serial && (
+      {status === 'idle' && !selectedId && (
         <div className="chart-overlay">
-          <p>Select a balloon to view its wind profile</p>
+          <p>Select a balloon or station to view its wind profile</p>
         </div>
       )}
 

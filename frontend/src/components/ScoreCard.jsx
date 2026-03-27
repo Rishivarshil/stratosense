@@ -73,7 +73,9 @@ function sampleProfile(profile) {
   );
 }
 
-export default function ScoreCard({ serial }) {
+export default function ScoreCard({ source = 'balloon', serial = null, id = null, stationTimeIndex = 0 }) {
+  const selectedId = id ?? serial;
+  const isStation = source === 'station';
   const [analysis,   setAnalysis]   = useState(null);
   const [forecast,   setForecast]   = useState(null);
   const [telemetry,  setTelemetry]  = useState(null);
@@ -84,7 +86,7 @@ export default function ScoreCard({ serial }) {
   const pollRef = useRef(null);
 
   useEffect(() => {
-    if (!serial) {
+    if (!selectedId) {
       setAnalysis(null); setForecast(null); setTelemetry(null);
       setAtmStatus(null); setAtmProfile(null); setStatus('idle');
       return;
@@ -94,11 +96,17 @@ export default function ScoreCard({ serial }) {
     async function fetchAll() {
       try {
         const [aRes, fRes, tRes, sRes, pRes] = await Promise.all([
-          fetch(`/balloon/${serial}/analysis`),
-          fetch(`/balloon/${serial}/forecast`),
-          fetch(`/balloon/${serial}/telemetry`),
-          fetch(`/atmosphere/status`),
-          fetch(`/atmosphere/profile`),
+          fetch(
+            isStation
+              ? `/station/${selectedId}/analysis?time_index=${stationTimeIndex}`
+              : `/balloon/${selectedId}/analysis`
+          ),
+          isStation ? Promise.resolve({ ok: false }) : fetch(`/balloon/${selectedId}/forecast`),
+          isStation ? Promise.resolve({ ok: false }) : fetch(`/balloon/${selectedId}/telemetry`),
+          isStation ? Promise.resolve({ ok: false }) : fetch(`/atmosphere/status`),
+          isStation
+            ? fetch(`/station/${selectedId}/profile?time_index=${stationTimeIndex}`)
+            : fetch(`/atmosphere/profile`),
         ]);
         if (cancelled) return;
         if (!aRes.ok) throw new Error(`Analysis ${aRes.status}`);
@@ -111,7 +119,24 @@ export default function ScoreCard({ serial }) {
         ]);
         if (!cancelled) {
           setAnalysis(aData); setForecast(fData); setTelemetry(tData);
-          setAtmStatus(sData); setAtmProfile(pData); setStatus('live');
+          setAtmStatus(sData);
+          if (isStation && pData?.path) {
+            const converted = pData.path.map((row) => ({
+              altitude_m: row.alt,
+              temp_c: row.temp,
+              pressure_hpa: row.pressure_hpa,
+              humidity_pct: row.humidity,
+              wind: {
+                speed_ms: row.wind_speed_ms,
+                direction_deg: row.wind_dir_deg,
+              },
+              source: row.source || 'interpolated',
+            }));
+            setAtmProfile({ profile: converted });
+          } else {
+            setAtmProfile(pData);
+          }
+          setStatus(isStation ? 'done' : 'live');
         }
       } catch (err) {
         if (!cancelled) { setError(err.message); setStatus('error'); }
@@ -121,11 +146,11 @@ export default function ScoreCard({ serial }) {
     setStatus('loading'); setError(null);
     clearInterval(pollRef.current);
     fetchAll().then(() => {
-      if (!cancelled)
+      if (!cancelled && !isStation)
         pollRef.current = setInterval(() => { if (!cancelled) fetchAll(); }, LIVE_POLL_MS);
     });
     return () => { cancelled = true; clearInterval(pollRef.current); };
-  }, [serial]);
+  }, [selectedId, isStation, stationTimeIndex]);
 
   const a = analysis;
   const rk = riskKey(a?.storm_risk);
@@ -138,7 +163,7 @@ export default function ScoreCard({ serial }) {
     <div className="scorecard-container">
       <div className="chart-header">
         <h2>Instability Score Card</h2>
-        {serial && <span className="serial-tag">{serial}</span>}
+        {selectedId && <span className="serial-tag">{selectedId}{isStation ? ' (station)' : ''}</span>}
         {status === 'live' && <span className="live-badge">Live</span>}
       </div>
 
@@ -149,7 +174,7 @@ export default function ScoreCard({ serial }) {
         <div className="chart-overlay error"><p>Error: {error}</p></div>
       )}
       {status === 'idle' && (
-        <div className="chart-overlay"><p>Select a balloon to view instability metrics</p></div>
+        <div className="chart-overlay"><p>Select a balloon or station to view instability metrics</p></div>
       )}
 
       {a && (
@@ -194,7 +219,7 @@ export default function ScoreCard({ serial }) {
           </div>
 
           {/* ── Data Assimilation Status ──────────────────────────── */}
-          {atmStatus && (
+          {atmStatus && !isStation && (
             <div className="sc-section">
               <div className="sc-section-title">
                 Data Assimilation
@@ -269,7 +294,7 @@ export default function ScoreCard({ serial }) {
           )}
 
           {/* ── Forecast ─────────────────────────────────────────── */}
-          {forecast?.details?.length > 0 && (
+          {forecast?.details?.length > 0 && !isStation && (
             <div className="forecast-section">
               <h3 className="forecast-heading">Forecast</h3>
               <ul className="forecast-list">

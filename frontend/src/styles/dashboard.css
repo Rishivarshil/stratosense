@@ -1404,6 +1404,20 @@
   transition: opacity 0.1s;
 }
 
+.station-scrubber {
+  gap: 10px;
+}
+
+.station-scrubber-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.station-height-fill {
+  background: linear-gradient(to right, #2f9e44, #4a6cf7);
+}
+
 .model-card-container {
   display: flex;
   flex-direction: column;
