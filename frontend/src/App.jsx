@@ -7,6 +7,13 @@ import WindBarbs from './components/WindBarbs';
 import ScoreCard from './components/ScoreCard';
 import './App.css';
 
+const TABS = [
+  { id: '3d',      label: '3D Profile',  icon: '◈' },
+  { id: 'sounding',label: 'Sounding',    icon: '〰' },
+  { id: 'wind',    label: 'Wind',        icon: '⊹' },
+  { id: 'score',   label: 'Score Card',  icon: '◎' },
+];
+
 function formatTimeOfDay(seconds) {
   const h = Math.floor(seconds / 3600) % 24;
   const m = Math.floor((seconds % 3600) / 60);
@@ -24,16 +31,13 @@ export default function App() {
   const [serialInput, setSerialInput] = useState('');
   const [activeSerial, setActiveSerial] = useState(null);
   const [serverStatus, setServerStatus] = useState(null);
+  const [activeTab, setActiveTab] = useState('3d');
 
-  // Global time-of-day slider (0–86400 s)
   const [timeOfDay, setTimeOfDay] = useState(nowSeconds);
-
-  // Per-balloon flight scrubber
   const [flightFrames, setFlightFrames] = useState(null);
   const [scrubIndex, setScrubIndex] = useState(0);
   const [analysis, setAnalysis] = useState(null);
 
-  // Status check
   useEffect(() => {
     fetch('/status')
       .then((r) => r.json())
@@ -41,7 +45,6 @@ export default function App() {
       .catch(() => setServerStatus({ status: 'offline' }));
   }, []);
 
-  // Listen for balloonSelected DOM events from the Globe
   useEffect(() => {
     function onBalloonSelected(e) {
       const serial = e.detail?.serial;
@@ -54,7 +57,6 @@ export default function App() {
     return () => document.removeEventListener('balloonSelected', onBalloonSelected);
   }, []);
 
-  // Fetch flight path + analysis whenever active balloon changes
   const loadFlightData = useCallback(async (serial) => {
     setFlightFrames(null);
     setAnalysis(null);
@@ -107,7 +109,6 @@ export default function App() {
           <span className="subtitle">Atmospheric Analysis</span>
         </div>
 
-        {/* Global time-of-day slider */}
         <div className="time-slider-wrap">
           <span className="time-label">12 AM</span>
           <div className="time-track">
@@ -126,10 +127,7 @@ export default function App() {
           </div>
           <span className="time-label">12 AM+1</span>
           <span className="time-current">{formatTimeOfDay(timeOfDay)}</span>
-          <button
-            className="time-now-btn"
-            onClick={() => setTimeOfDay(nowSeconds())}
-          >
+          <button className="time-now-btn" onClick={() => setTimeOfDay(nowSeconds())}>
             NOW
           </button>
         </div>
@@ -145,7 +143,6 @@ export default function App() {
         {/* ── LEFT: globe + flight scrubber ── */}
         <div className="left-panel">
           <Globe selectedSerial={activeSerial} scrubFrame={scrubFrame} />
-
           <FlightScrubber
             frames={flightFrames}
             scrubIndex={scrubIndex}
@@ -153,7 +150,7 @@ export default function App() {
           />
         </div>
 
-        {/* ── RIGHT: controls + altitude column + charts ── */}
+        {/* ── RIGHT: serial input + tabbed charts ── */}
         <div className="right-panel">
           <div className="controls">
             <form onSubmit={handleLoad} className="serial-form">
@@ -179,15 +176,41 @@ export default function App() {
             )}
           </div>
 
-          <div className="chart-area">
-            <AltitudeColumn
-              frames={flightFrames}
-              scrubIndex={scrubIndex}
-              analysis={analysis}
-            />
-            <SoundingChart serial={activeSerial} />
-            <WindBarbs serial={activeSerial} />
-            <ScoreCard serial={activeSerial} />
+          {/* Tab bar */}
+          <div className="tab-bar">
+            {TABS.map((tab) => (
+              <button
+                key={tab.id}
+                className={`tab-btn${activeTab === tab.id ? ' active' : ''}`}
+                onClick={() => setActiveTab(tab.id)}
+              >
+                <span className="tab-icon">{tab.icon}</span>
+                <span className="tab-label">{tab.label}</span>
+              </button>
+            ))}
+          </div>
+
+          {/* Tab panels — all mounted, only active one visible */}
+          <div className="tab-panels">
+            <div className="tab-panel tab-panel-3d" style={{ display: activeTab === '3d' ? 'flex' : 'none' }}>
+              <AltitudeColumn
+                frames={flightFrames}
+                scrubIndex={scrubIndex}
+                analysis={analysis}
+              />
+            </div>
+
+            <div className="tab-panel" style={{ display: activeTab === 'sounding' ? 'block' : 'none' }}>
+              <SoundingChart serial={activeSerial} />
+            </div>
+
+            <div className="tab-panel" style={{ display: activeTab === 'wind' ? 'block' : 'none' }}>
+              <WindBarbs serial={activeSerial} />
+            </div>
+
+            <div className="tab-panel" style={{ display: activeTab === 'score' ? 'block' : 'none' }}>
+              <ScoreCard serial={activeSerial} />
+            </div>
           </div>
         </div>
       </div>

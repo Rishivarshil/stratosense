@@ -140,7 +140,7 @@
   flex: 1;
   display: flex;
   flex-direction: column;
-  overflow-y: auto;
+  overflow: hidden;
   min-height: 0;
 }
 
@@ -274,13 +274,93 @@
   background: #3a5ce5;
 }
 
-/* ── Chart area ─────────────────────────────────────────────── */
+/* ── Chart area (legacy, kept for safety) ────────────────────── */
 
 .chart-area {
   padding: 16px 20px;
   display: flex;
   flex-direction: column;
   gap: 16px;
+}
+
+/* ── Tab bar ─────────────────────────────────────────────────── */
+
+.tab-bar {
+  display: flex;
+  background: #0b1624;
+  border-bottom: 1px solid #1a3050;
+  padding: 0 4px;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.tab-btn {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 12px 18px;
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: #4a6a8a;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  letter-spacing: 0.3px;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
+  white-space: nowrap;
+  position: relative;
+}
+
+.tab-btn:hover {
+  color: #7eb3e8;
+  background: rgba(74, 108, 247, 0.06);
+}
+
+.tab-btn.active {
+  color: #7eb3e8;
+  border-bottom-color: #4a6cf7;
+  background: rgba(74, 108, 247, 0.08);
+}
+
+.tab-btn.active .tab-icon {
+  color: #4a6cf7;
+  text-shadow: 0 0 10px rgba(74, 108, 247, 0.7);
+}
+
+.tab-icon {
+  font-size: 1rem;
+  line-height: 1;
+  transition: color 0.15s, text-shadow 0.15s;
+}
+
+.tab-label {
+  font-size: 0.78rem;
+  letter-spacing: 0.4px;
+}
+
+/* ── Tab panels ──────────────────────────────────────────────── */
+
+.tab-panels {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.tab-panel {
+  flex: 1;
+  min-height: 0;
+  padding: 16px 20px;
+  overflow-y: auto;
+}
+
+/* 3D tab — no padding, flex column so canvas fills all available height */
+.tab-panel-3d {
+  padding: 0;
+  flex-direction: column;
+  overflow: hidden;
 }
 
 /* ── Responsive: stack on narrow screens ───────────────────── */
@@ -595,6 +675,8 @@
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  flex: 1;
+  min-height: 0;
 }
 
 .altitude-col-header {
@@ -628,42 +710,76 @@
 .altitude-col-body-3d {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  flex: 1;
+  min-height: 0;
 }
 
 .altitude-3d-scene-wrap {
   position: relative;
+  flex: 1;
+  min-height: 0;
   width: 100%;
 }
 
 .altitude-3d-mount {
   width: 100%;
-  height: 360px;
+  height: 100%;
+  min-height: 300px;
   display: block;
+  /* Three.js sets canvas inline width/height — do NOT override with CSS */
 }
 
 .altitude-3d-mount canvas {
   display: block;
-  width: 100% !important;
 }
 
 .altitude-3d-legend {
   position: absolute;
-  bottom: 8px;
-  left: 10px;
+  top: 10px;
+  right: 12px;
   display: flex;
   flex-direction: column;
-  gap: 3px;
+  gap: 5px;
   pointer-events: none;
+  background: rgba(10, 20, 40, 0.82);
+  border: 1px solid rgba(74, 108, 247, 0.25);
+  border-radius: 6px;
+  padding: 10px 12px;
+  backdrop-filter: blur(6px);
+  min-width: 160px;
+}
+
+.legend-title {
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: #5a7a9a;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-bottom: 4px;
+  border-bottom: 1px solid rgba(74, 108, 247, 0.2);
+  padding-bottom: 5px;
 }
 
 .axis-label {
-  font-size: 0.65rem;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 0.78rem;
   font-family: monospace;
-  padding: 1px 5px;
-  border-radius: 2px;
-  backdrop-filter: blur(2px);
+  padding: 2px 0;
 }
+
+.axis-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.axis-x .axis-dot { background: #4488cc; }
+.axis-y .axis-dot { background: #44cc88; }
+.axis-z .axis-dot { background: #cc8844; }
+.axis-tropo .axis-dot { background: #cc88ff; border-radius: 2px; }
 
 .axis-x     { color: #7eb3e8; }
 .axis-y     { color: #5ecf9a; }
@@ -679,12 +795,209 @@
   background: #0d1b2e;
 }
 
+/* ── Atmospheric layer labels overlay ─── */
+
+.atmo-layer-labels {
+  position: absolute;
+  left: 10px;
+  top: 0;
+  bottom: 0;
+  pointer-events: none;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+}
+
+.atmo-layer-label {
+  position: absolute;
+  left: 0;
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  opacity: 0.55;
+  white-space: nowrap;
+  transition: opacity 0.3s, text-shadow 0.3s;
+  text-shadow: 0 0 8px currentColor;
+}
+
+.atmo-layer-label.active {
+  opacity: 1;
+  text-shadow: 0 0 14px currentColor, 0 0 4px rgba(0,0,0,0.8);
+  font-size: 0.72rem;
+}
+
+.atmo-layer-label.zoom-active {
+  opacity: 1;
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-shadow: 0 0 20px currentColor, 0 0 8px currentColor, 0 0 2px rgba(255,255,255,0.6);
+  transform: translateX(4px);
+  transition: opacity 0.2s, text-shadow 0.2s, font-size 0.2s, transform 0.2s;
+}
+
+/* ── Weather effects legend overlay ─── */
+
+.weather-effects-legend {
+  position: absolute;
+  top: 10px;
+  right: 12px;
+  pointer-events: none;
+  background: rgba(8, 16, 32, 0.78);
+  border: 1px solid rgba(74, 138, 223, 0.3);
+  border-radius: 6px;
+  padding: 9px 12px;
+  backdrop-filter: blur(8px);
+  min-width: 140px;
+}
+
+.weather-effects-title {
+  font-size: 0.6rem;
+  font-weight: 700;
+  color: #3d6080;
+  text-transform: uppercase;
+  letter-spacing: 1.2px;
+  margin-bottom: 7px;
+  border-bottom: 1px solid rgba(74, 138, 223, 0.2);
+  padding-bottom: 5px;
+}
+
+.weather-effect-item {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 0.7rem;
+  color: #7090b0;
+  padding: 3px 5px;
+  margin: 0 -5px;
+  border-radius: 4px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+  pointer-events: auto;
+}
+
+.weather-effect-item:hover {
+  background: rgba(74, 138, 223, 0.15);
+  color: #b0d0f0;
+}
+
+.weather-effect-item.active {
+  background: rgba(74, 138, 223, 0.22);
+  color: #e0f0ff;
+}
+
+/* ── Effect detail panel ─── */
+
+.effect-detail-panel {
+  position: absolute;
+  bottom: 12px;
+  left: 12px;
+  min-width: 210px;
+  background: rgba(6, 14, 28, 0.92);
+  border: 1px solid;
+  border-radius: 8px;
+  padding: 10px 14px 12px;
+  backdrop-filter: blur(10px);
+  pointer-events: auto;
+  z-index: 10;
+}
+
+.effect-detail-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-bottom: 9px;
+  padding-bottom: 7px;
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+}
+
+.effect-detail-close {
+  background: none;
+  border: none;
+  color: #4a6a8a;
+  font-size: 0.75rem;
+  cursor: pointer;
+  padding: 0 2px;
+  line-height: 1;
+}
+
+.effect-detail-close:hover {
+  color: #aac;
+}
+
+.effect-detail-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  padding: 3px 0;
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+}
+
+.effect-detail-row:last-child {
+  border-bottom: none;
+}
+
+.effect-detail-key {
+  font-size: 0.65rem;
+  color: #3d6080;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  white-space: nowrap;
+}
+
+.effect-detail-val {
+  font-size: 0.78rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: #c0d8f0;
+  text-align: right;
+}
+
 .altitude-readout-3d {
   display: flex;
   flex-direction: row;
+  align-items: center;
   flex-wrap: wrap;
-  gap: 8px 24px;
-  padding: 8px 16px 12px;
+  gap: 0;
+  background: #08111e;
+  border-top: 1px solid #1a3050;
+  flex-shrink: 0;
+}
+
+.readout-pill {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 8px 20px;
+  border-right: 1px solid #1a3050;
+  gap: 2px;
+  min-width: 80px;
+}
+
+.readout-pill:last-child {
+  border-right: none;
+}
+
+.readout-pill-key {
+  font-size: 0.6rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: #3d6080;
+}
+
+.readout-pill-val {
+  font-size: 1rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: #e8eaf0;
+  line-height: 1.2;
 }
 
 .altitude-canvas {
