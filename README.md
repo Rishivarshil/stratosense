@@ -4,6 +4,7 @@ Real-time atmospheric analysis platform for weather balloon telemetry. Tracks ac
 
 ## Features
 
+- **Front Landing Page** — cinematic homepage at `/` with live status and direct dashboard access
 - **Live Balloon Tracker** — interactive globe map showing active radiosondes worldwide
 - **Atmospheric Sounding Chart** — temperature and dewpoint profiles vs altitude
 - **Wind Barb Visualization** — standard meteorological wind profile by altitude band
@@ -21,10 +22,9 @@ SondeHub API  →  Flask + SocketIO backend (port 8080)  →  React + Vite front
 | Layer | Technology |
 | --- | --- |
 | Data source | SondeHub API (global radiosonde network) |
-| Backend | Python 3, Flask, Flask-SocketIO |
+| Backend | Python 3, Flask, Flask-SocketIO, Requests, python-dotenv |
 | Frontend | React 19, Vite 8 |
-| Mapping | Leaflet |
-| Charts | Chart.js 4 + react-chartjs-2 |
+| 3D / visualization | Three.js, Chart.js 4, react-chartjs-2 |
 
 ## Requirements
 
@@ -36,6 +36,10 @@ SondeHub API  →  Flask + SocketIO backend (port 8080)  →  React + Vite front
 - `requests`
 - `python-dotenv`
 
+Optional for running backend tests:
+
+- `pytest`
+
 ### Frontend (Node)
 
 - Node.js 20+
@@ -44,11 +48,14 @@ SondeHub API  →  Flask + SocketIO backend (port 8080)  →  React + Vite front
 Dependencies are listed in [frontend/package.json](frontend/package.json). Key packages:
 
 - `react` 19
+- `react-dom` 19
+- `react-router-dom` 7
+- `three`
+- `chart.js` 4
+- `react-chartjs-2`
 - `vite` 8
-- `chart.js` 4 + `react-chartjs-2`
 - `chartjs-plugin-annotation`
 - `chartjs-plugin-zoom`
-- `leaflet` + `react-leaflet`
 
 ## Setup & Running
 
@@ -89,6 +96,12 @@ From the repo root:
 pip install flask flask-socketio requests python-dotenv
 ```
 
+If you also want to run the backend tests:
+
+```bash
+pip install pytest
+```
+
 ### 4. Start the backend
 
 ```bash
@@ -107,6 +120,17 @@ cd frontend
 npm install
 ```
 
+This installs the frontend dependencies from `frontend/package.json`, including:
+
+- `react`
+- `react-dom`
+- `react-router-dom`
+- `three`
+- `chart.js`
+- `react-chartjs-2`
+- `chartjs-plugin-annotation`
+- `chartjs-plugin-zoom`
+
 ### 6. Start the frontend
 
 ```bash
@@ -114,6 +138,9 @@ npm run dev
 ```
 
 The frontend starts at `http://localhost:5173`.
+
+- Landing page: `http://localhost:5173/`
+- Dashboard: `http://localhost:5173/dashboard`
 
 ### 7. Summary
 
@@ -162,6 +189,8 @@ stratosense/
     ├── vite.config.js
     └── src/
         ├── App.jsx                          # Router entrypoint
+        ├── assets/
+        │   └── hero-stratosphere.png        # Landing page hero background
         ├── components/
         │   ├── Globe.jsx                    # Leaflet balloon map
         │   ├── FlightScrubber.jsx           # Timeline slider

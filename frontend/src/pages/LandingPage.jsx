@@ -1,24 +1,30 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import heroImage from '../assets/hero-stratosphere.png';
 import '../styles/landing.css';
 
 const FEATURES = [
   {
-    title: 'Live',
-    description: 'Global tracking.',
+    icon: '◈',
+    title: '3D Flight Profiles',
+    description: 'Track balloon paths through altitude, position, and time in one view.',
   },
   {
-    title: 'Analysis',
-    description: 'Atmospheric insight.',
+    icon: '〰',
+    title: 'Atmospheric Sounding',
+    description: 'Read temperature, moisture, and vertical structure with less friction.',
   },
   {
-    title: 'Clarity',
-    description: 'Simple output.',
+    icon: '⊹',
+    title: 'Wind Analysis',
+    description: 'Surface shear, flow, and profile changes faster than a raw feed can.',
+  },
+  {
+    icon: '◎',
+    title: 'Decision Support',
+    description: 'Move from telemetry to actionable atmospheric context in seconds.',
   },
 ];
-
-const BALLOON_PREVIEW_TOTAL = 100;
-const BALLOON_PREVIEW_ACTIVE = 10;
 
 export default function LandingPage() {
   const [serverStatus, setServerStatus] = useState(null);
@@ -38,71 +44,114 @@ export default function LandingPage() {
 
   return (
     <div className="landing-shell">
-      <header className="apple-nav">
-        <Link className="apple-wordmark" to="/">
-          StratoSense
+      <header className="landing-nav">
+        <Link className="landing-wordmark" to="/">
+          <span className="nav-cloud-outline" aria-hidden="true">
+            <span className="nav-cloud-bump nav-cloud-bump-left" />
+            <span className="nav-cloud-bump nav-cloud-bump-center" />
+            <span className="nav-cloud-bump nav-cloud-bump-right" />
+            <span className="nav-cloud-base" />
+          </span>
+          <span className="landing-wordmark-text">StratoSense</span>
         </Link>
 
-        <Link className="apple-nav-cta" to="/dashboard">
-          Dashboard
-        </Link>
+        <div className="landing-nav-actions">
+          <span className="landing-status">
+            <span className={`status-dot ${online ? 'online' : 'offline'}`} />
+            <span>{online ? 'Live data' : 'Offline'}</span>
+          </span>
+          <Link className="landing-nav-cta" to="/dashboard">
+            Dashboard
+          </Link>
+        </div>
       </header>
 
       <main>
-        <section className="hero-wrap">
-          <h1 className="hero-title">
-            StratoSense
-          </h1>
-          <p className="hero-subtitle">
-            Live weather-balloon intelligence.
-          </p>
-
-          <div className="hero-actions">
-            <Link className="hero-primary" to="/dashboard">
-              Open dashboard
-            </Link>
-            <a className="hero-secondary" href="https://sondehub.org">
-              SondeHub
-            </a>
+        <section className="hero-section">
+          <div className="hero-backdrop" aria-hidden="true">
+            <img
+              src={heroImage}
+              alt=""
+              className="hero-image"
+            />
+            <div className="hero-image-overlay" />
+            <div className="hero-glow hero-glow-primary" />
+            <div className="hero-glow hero-glow-accent" />
+            <div className="hero-grid" />
           </div>
 
-          <div className="hero-frame" aria-label="Platform overview">
-            <div className="hero-frame-top">
-              <div>
-                <p className="frame-label">Deployed balloons</p>
-                <h2>{activeBalloons}</h2>
+          <div className="hero-content">
+            <p className="hero-kicker">Atmospheric Intelligence Platform</p>
+
+            <div className="hero-title-wrap">
+              <div className="cloud-outline" aria-hidden="true">
+                <span className="cloud-bump cloud-bump-left" />
+                <span className="cloud-bump cloud-bump-center" />
+                <span className="cloud-bump cloud-bump-right" />
+                <span className="cloud-base" />
               </div>
-              <span className={`frame-status ${online ? 'online' : 'offline'}`}>
-                {online ? 'Live' : 'Offline'}
-              </span>
+              <h1 className="hero-title">StratoSense</h1>
             </div>
 
-            <div className="balloon-legend">
-              <span className="balloon-legend-chip active">10 active</span>
-              <span className="balloon-legend-chip">100 shown</span>
+            <p className="hero-subtitle">
+              Live weather-balloon tracking, atmospheric sounding, and flight analysis in one instrument panel.
+            </p>
+
+            <div className="hero-actions">
+              <Link className="hero-primary" to="/dashboard">
+                Open Dashboard
+              </Link>
+              <a
+                className="hero-secondary"
+                href="https://sondehub.org"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                SondeHub
+              </a>
             </div>
 
-            <div className="balloon-grid" aria-hidden="true">
-              {Array.from({ length: BALLOON_PREVIEW_TOTAL }, (_, index) => (
-                <span
-                  key={index}
-                  className={`balloon-icon ${
-                    online && index < BALLOON_PREVIEW_ACTIVE ? 'active' : ''
-                  }`}
-                />
-              ))}
+            <div className="stats-strip">
+              <div className="stat-item">
+                <p>Active Balloons</p>
+                <strong>{activeBalloons}</strong>
+              </div>
+              <div className="stat-item">
+                <p>Coverage</p>
+                <strong>Global</strong>
+              </div>
+              <div className="stat-item">
+                <p>View</p>
+                <strong>Realtime</strong>
+              </div>
             </div>
           </div>
         </section>
 
         <section className="feature-section">
+          <div className="section-heading">
+            <p className="hero-kicker">Capabilities</p>
+            <h2>Full-spectrum analysis</h2>
+          </div>
+
           <div className="feature-grid">
             {FEATURES.map((feature) => (
               <article key={feature.title} className="feature-tile">
+                <span className="feature-icon">{feature.icon}</span>
                 <h3>{feature.title}</h3>
                 <p>{feature.description}</p>
               </article>
             ))}
+          </div>
+        </section>
+
+        <section className="cta-section">
+          <div className="cta-panel">
+            <h2>Ready to explore the atmosphere?</h2>
+            <p>Open the dashboard and inspect live radiosonde flights in real time.</p>
+            <Link className="hero-primary" to="/dashboard">
+              Launch Dashboard
+            </Link>
           </div>
         </section>
       </main>
