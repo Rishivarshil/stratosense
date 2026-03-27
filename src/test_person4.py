@@ -20,7 +20,15 @@ from flask import Flask
 
 import interpolation as interp
 import assimilation as assim
-from atmosphere import atmosphere_bp, _parse_synoptic_obs, calc_balloon_age, COLUMBUS_DEFAULTS
+from atmosphere import (
+    atmosphere_bp,
+    _parse_synoptic_obs,
+    calc_balloon_age,
+    COLUMBUS_DEFAULTS,
+    _ordinary_kriging_value,
+    _kriging_surface_from_stations,
+    get_latest_balloon_data,
+)
 from sdr_integration import sdr_bp, compare_positions
 
 
@@ -656,7 +664,142 @@ class TestCalcBalloonAge:
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# 12. ATMOSPHERE — FLASK ENDPOINTS
+# 12. ATMOSPHERE — KRIGING INTERPOLATION QUALITY
+# ═══════════════════════════════════════════════════════════════════════════════
+
+class TestKrigingInterpolation:
+    def test_exact_station_reconstruction(self):
+        """Kriging should reproduce observed value at station location."""
+        samples = [
+            {'lat': 40.0, 'lon': -83.0, 'value': 10.0},
+            {'lat': 40.2, 'lon': -82.8, 'value': 20.0},
+            {'lat': 39.8, 'lon': -83.2, 'value': 15.0},
+        ]
+        est = _ordinary_kriging_value(samples, 40.0, -83.0)
+        assert est is not None
+        assert abs(est - 10.0) < 1.0
+
+    def test_interpolated_value_is_bounded(self):
+        """For smooth fields, estimate should stay within neighborhood range."""
+        samples = [
+            {'lat': 39.8, 'lon': -83.2, 'value': 12.0},
+            {'lat': 40.2, 'lon': -82.8, 'value': 18.0},
+            {'lat': 40.1, 'lon': -83.1, 'value': 16.0},
+            {'lat': 39.9, 'lon': -82.9, 'value': 14.0},
+        ]
+        est = _ordinary_kriging_value(samples, 40.0, -83.0)
+        assert est is not None
+        assert min(s['value'] for s in samples) - 0.5 <= est <= max(s['value'] for s in samples) + 0.5
+
+    def test_relative_continuity_small_position_change(self):
+        """A small target shift should not produce a large jump."""
+        samples = [
+            {'lat': 39.95, 'lon': -83.05, 'value': 14.0},
+            {'lat': 40.05, 'lon': -83.05, 'value': 14.6},
+            {'lat': 39.95, 'lon': -82.95, 'value': 15.2},
+            {'lat': 40.05, 'lon': -82.95, 'value': 15.8},
+        ]
+        est_a = _ordinary_kriging_value(samples, 40.000, -83.000)
+        est_b = _ordinary_kriging_value(samples, 40.005, -82.995)
+        assert est_a is not None and est_b is not None
+        assert abs(est_b - est_a) < 0.8
+
+    def test_surface_kriging_preserves_physical_wind(self):
+        stations = [
+            {
+                'station_id': 'A', 'lat': 39.9, 'lon': -83.1,
+                'temp_c': 14.0, 'dewpoint_c': 8.0, 'pressure_hpa': 1014.0,
+                'elev_m': 240.0, 'wind_speed_ms': 4.0, 'wind_dir_deg': 220.0,
+            },
+            {
+                'station_id': 'B', 'lat': 40.1, 'lon': -82.9,
+                'temp_c': 16.0, 'dewpoint_c': 9.0, 'pressure_hpa': 1012.0,
+                'elev_m': 255.0, 'wind_speed_ms': 6.0, 'wind_dir_deg': 240.0,
+            },
+            {
+                'station_id': 'C', 'lat': 40.0, 'lon': -83.0,
+                'temp_c': 15.0, 'dewpoint_c': 8.5, 'pressure_hpa': 1013.0,
+                'elev_m': 247.0, 'wind_speed_ms': 5.0, 'wind_dir_deg': 230.0,
+            },
+        ]
+        surface = _kriging_surface_from_stations(stations)
+        assert surface is not None
+        assert surface['station_id'].startswith('KRIGING_')
+        assert 0 <= surface['wind_dir_deg'] < 360
+        assert surface['wind_speed_ms'] >= 0
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 13. ATMOSPHERE — BALLOON PROXIMITY FILTERING
+# ═══════════════════════════════════════════════════════════════════════════════
+
+class TestNearbyBalloonSelection:
+    def test_uses_only_nearby_balloons(self):
+        balloons_payload = {
+            'balloons': [
+                {'serial': 'NEAR1', 'lat': 39.99, 'lon': -83.01},
+                {'serial': 'NEAR2', 'lat': 40.05, 'lon': -83.00},
+                {'serial': 'FAR1', 'lat': 44.00, 'lon': -75.00},
+            ],
+        }
+
+        def _mock_get(url, timeout=5, **kwargs):
+            m = MagicMock()
+            if url.endswith('/balloons'):
+                m.ok = True
+                m.json.return_value = balloons_payload
+                return m
+            if url.endswith('/balloon/NEAR1'):
+                m.ok = True
+                m.json.return_value = {'path': [{'alt': 1000, 'temp': 5, 'serial': 'NEAR1'}]}
+                return m
+            if url.endswith('/balloon/NEAR2'):
+                m.ok = True
+                m.json.return_value = {'path': [{'alt': 1100, 'temp': 4, 'serial': 'NEAR2'}]}
+                return m
+            if url.endswith('/balloon/FAR1'):
+                m.ok = True
+                m.json.return_value = {'path': [{'alt': 900, 'temp': 6, 'serial': 'FAR1'}]}
+                return m
+            m.ok = False
+            m.json.return_value = {}
+            return m
+
+        with patch('requests.get', side_effect=_mock_get):
+            frames = get_latest_balloon_data(target_lat=39.99, target_lon=-83.01)
+
+        assert frames is not None
+        serials = {f.get('serial') for f in frames}
+        assert 'NEAR1' in serials
+        assert 'NEAR2' in serials
+        assert 'FAR1' not in serials
+
+    def test_returns_none_when_only_far_balloons(self):
+        balloons_payload = {
+            'balloons': [
+                {'serial': 'FAR1', 'lat': 46.0, 'lon': -90.0},
+                {'serial': 'FAR2', 'lat': 45.5, 'lon': -89.8},
+            ],
+        }
+
+        def _mock_get(url, timeout=5, **kwargs):
+            m = MagicMock()
+            if url.endswith('/balloons'):
+                m.ok = True
+                m.json.return_value = balloons_payload
+                return m
+            m.ok = False
+            m.json.return_value = {}
+            return m
+
+        with patch('requests.get', side_effect=_mock_get):
+            frames = get_latest_balloon_data(target_lat=39.99, target_lon=-83.01)
+
+        assert frames is None
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 14. ATMOSPHERE — FLASK ENDPOINTS
 # ═══════════════════════════════════════════════════════════════════════════════
 
 class TestAtmosphereEndpoints:
@@ -757,6 +900,21 @@ class TestAtmosphereEndpoints:
         assert data['balloon_serial'] == 'T123'
         assimilated = [l for l in data['profile'] if l['source'] == 'assimilated']
         assert len(assimilated) > 0
+
+    @patch('atmosphere.get_latest_balloon_data')
+    @patch('atmosphere.get_latest_surface_obs')
+    def test_profile_reports_multiple_balloon_serials(self, mock_surface, mock_balloon, client):
+        mock_surface.return_value = dict(COLUMBUS_DEFAULTS)
+        now = datetime.now(timezone.utc)
+        mock_balloon.return_value = [
+            {'alt': 900, 'temp': 13.0, 'humidity': 60, 'serial': 'A1',
+             'datetime': (now - timedelta(minutes=10)).strftime('%Y-%m-%dT%H:%M:%SZ')},
+            {'alt': 1200, 'temp': 11.0, 'humidity': 55, 'serial': 'B2',
+             'datetime': (now - timedelta(minutes=8)).strftime('%Y-%m-%dT%H:%M:%SZ')},
+        ]
+        data = client.get('/atmosphere/profile').get_json()
+        assert data['balloon_serial'] is None
+        assert sorted(data['balloon_serials']) == ['A1', 'B2']
 
     @patch('atmosphere.get_latest_balloon_data', return_value=None)
     @patch('atmosphere.get_latest_surface_obs')
