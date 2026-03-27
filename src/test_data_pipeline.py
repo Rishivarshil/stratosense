@@ -248,6 +248,27 @@ class TestCapeCin:
         assert isinstance(cin, float)
         assert isinstance(risk, str)
 
+    def test_drier_surface_reduces_cape(self):
+        humid_frames = _make_frames(
+            n=120,
+            surface_temp=28,
+            lapse=7.0,
+            humidity_surface=90,
+        )
+        dry_frames = _make_frames(
+            n=120,
+            surface_temp=28,
+            lapse=7.0,
+            humidity_surface=25,
+        )
+
+        humid_cape, _, _ = dp.calc_cape_cin(humid_frames)
+        dry_cape, _, _ = dp.calc_cape_cin(dry_frames)
+
+        assert dry_cape < humid_cape, (
+            f"Dry parcels should have less CAPE than humid ones, got dry={dry_cape}, humid={humid_cape}"
+        )
+
 
 class TestPrecipitableWater:
     def test_returns_float(self, realistic_frames):
