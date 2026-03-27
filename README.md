@@ -34,16 +34,11 @@ SondeHub API  →  Flask + SocketIO backend (port 8080)  →  React + Vite front
 - `flask`
 - `flask-socketio`
 - `requests`
-
-Install with:
-
-```bash
-pip install flask flask-socketio requests
-```
+- `python-dotenv`
 
 ### Frontend (Node)
 
-- Node.js 18+
+- Node.js 20+
 - npm 9+
 
 Dependencies are listed in [frontend/package.json](frontend/package.json). Key packages:
@@ -57,24 +52,83 @@ Dependencies are listed in [frontend/package.json](frontend/package.json). Key p
 
 ## Setup & Running
 
-### 1. Start the backend
+### 1. Clone the repo
+
+```bash
+git clone https://github.com/Bharathpillai06/stratosense.git
+cd stratosense
+```
+
+### 2. Create and activate a Python virtual environment
+
+#### Windows PowerShell
+
+```powershell
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+```
+
+If PowerShell blocks activation, run this once in the same shell and try again:
+
+```powershell
+Set-ExecutionPolicy -Scope Process Bypass
+```
+
+#### macOS / Linux
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+```
+
+### 3. Install backend dependencies inside the venv
+
+From the repo root:
+
+```bash
+pip install flask flask-socketio requests python-dotenv
+```
+
+### 4. Start the backend
 
 ```bash
 cd src
 python data_pipeline.py
 ```
 
-Server starts on `http://localhost:8080`. On first run it fetches all active balloons from SondeHub and begins a 30-second polling loop in the background.
+The API starts on `http://localhost:8080`. On first run it fetches active balloons from SondeHub and begins a 30-second polling loop in the background.
 
-### 2. Start the frontend
+### 5. Install frontend dependencies
+
+Open a second terminal at the repo root:
 
 ```bash
 cd frontend
 npm install
+```
+
+### 6. Start the frontend
+
+```bash
 npm run dev
 ```
 
-App opens at `http://localhost:5173`.
+The frontend starts at `http://localhost:5173`.
+
+### 7. Summary
+
+You should have:
+
+1. A backend terminal with the virtual environment activated and `python data_pipeline.py` running from `src`
+2. A frontend terminal running `npm run dev` from `frontend`
+
+### Optional: deactivate the virtual environment
+
+When you are done working on the backend:
+
+```bash
+deactivate
+```
 
 ## API Endpoints
 
@@ -107,7 +161,7 @@ stratosense/
     ├── package.json
     ├── vite.config.js
     └── src/
-        ├── App.jsx                          # Root component, layout, global scrubber
+        ├── App.jsx                          # Router entrypoint
         ├── components/
         │   ├── Globe.jsx                    # Leaflet balloon map
         │   ├── FlightScrubber.jsx           # Timeline slider
@@ -115,6 +169,12 @@ stratosense/
         │   ├── SoundingChart.jsx            # Temperature/dewpoint chart
         │   ├── WindBarbs.jsx                # SVG wind barb visualization
         │   └── ScoreCard.jsx                # Instability metrics dashboard
+        ├── pages/
+        │   ├── LandingPage.jsx              # Marketing landing page
+        │   └── DashboardPage.jsx            # Main analysis dashboard
+        ├── styles/
+        │   ├── landing.css                  # Landing page styles
+        │   └── dashboard.css                # Dashboard styles
         └── utils/
             ├── atmospheric.js               # Dewpoint (Magnus formula)
             └── wind.js                      # Wind data grouping by altitude band
