@@ -13,6 +13,7 @@
   display: flex;
   align-items: center;
   gap: 20px;
+  justify-content: space-between;
   padding: 10px 20px;
   background: #fff;
   border-bottom: 1px solid #ddd;
@@ -25,22 +26,74 @@
   gap: 16px;
 }
 
-.dashboard-home-link {
+.dashboard-wordmark {
+  position: relative;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 7px 12px;
-  border: 1px solid #d5d9e5;
-  border-radius: 999px;
-  color: #4a6cf7;
-  background: #f7f8ff;
+  min-height: 34px;
+  min-width: 158px;
+  padding: 0 12px;
+  color: #1d1d1f;
   text-decoration: none;
-  font-size: 0.8rem;
+  font-size: 1.2rem;
+  letter-spacing: 0.02em;
   font-weight: 600;
 }
 
-.dashboard-home-link:hover {
-  background: #eef1ff;
+.dashboard-wordmark:hover {
+  color: #2b3ca6;
+}
+
+.dashboard-wordmark-text {
+  position: relative;
+  z-index: 1;
+}
+
+.dashboard-nav-cloud-outline {
+  position: absolute;
+  inset: 50% auto auto 50%;
+  transform: translate(-50%, -50%);
+  width: 175px;
+  height: 48px;
+  opacity: 0.28;
+  pointer-events: none;
+}
+
+.dashboard-nav-cloud-bump,
+.dashboard-nav-cloud-base {
+  position: absolute;
+  border-radius: 999px;
+  border: 1.5px solid rgba(115, 129, 155, 0.42);
+  background: rgba(74, 108, 247, 0.03);
+}
+
+.dashboard-nav-cloud-bump-left {
+  left: 10%;
+  bottom: 7px;
+  width: 42px;
+  height: 26px;
+}
+
+.dashboard-nav-cloud-bump-center {
+  left: 34%;
+  top: 0;
+  width: 58px;
+  height: 31px;
+}
+
+.dashboard-nav-cloud-bump-right {
+  right: 11%;
+  bottom: 8px;
+  width: 44px;
+  height: 24px;
+}
+
+.dashboard-nav-cloud-base {
+  left: 20%;
+  right: 18%;
+  bottom: 2px;
+  height: 21px;
 }
 
 .time-slider-wrap {
@@ -121,7 +174,34 @@
   color: #888;
   text-transform: uppercase;
   letter-spacing: 1.5px;
-  margin-left: 12px;
+}
+
+.dashboard-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.dashboard-status-text {
+  font-size: 0.8rem;
+}
+
+.dashboard-status-pill {
+  width: 24px;
+  height: 10px;
+  border-radius: 999px;
+  display: inline-block;
+}
+
+.dashboard-status-pill.online {
+  background: #2de38c;
+  box-shadow: 0 0 12px rgba(45, 227, 140, 0.5);
+}
+
+.dashboard-status-pill.offline {
+  background: #f46f6f;
+  box-shadow: 0 0 10px rgba(244, 111, 111, 0.4);
 }
 
 .status-dot {

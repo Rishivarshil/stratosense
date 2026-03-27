@@ -15,25 +15,11 @@ const TABS = [
   { id: 'score', label: 'Score Card', icon: '◎' },
 ];
 
-function formatTimeOfDay(seconds) {
-  const h = Math.floor(seconds / 3600) % 24;
-  const m = Math.floor((seconds % 3600) / 60);
-  const ampm = h >= 12 ? 'PM' : 'AM';
-  const h12 = h % 12 || 12;
-  return `${h12}:${String(m).padStart(2, '0')} ${ampm}`;
-}
-
-function nowSeconds() {
-  const d = new Date();
-  return d.getHours() * 3600 + d.getMinutes() * 60 + d.getSeconds();
-}
-
 export default function DashboardPage() {
   const [serialInput, setSerialInput] = useState('');
   const [activeSerial, setActiveSerial] = useState(null);
   const [serverStatus, setServerStatus] = useState(null);
   const [activeTab, setActiveTab] = useState('3d');
-  const [timeOfDay, setTimeOfDay] = useState(nowSeconds);
   const [flightFrames, setFlightFrames] = useState(null);
   const [scrubIndex, setScrubIndex] = useState(0);
   const [analysis, setAnalysis] = useState(null);
@@ -106,43 +92,27 @@ export default function DashboardPage() {
       <header className="app-header">
         <div className="brand">
           <div className="brand-row">
-            <div>
-              <h1>StratoSense</h1>
-              <span className="subtitle">Atmospheric Analysis</span>
-            </div>
-            <Link className="dashboard-home-link" to="/">
-              Landing page
+            <Link className="dashboard-wordmark" to="/" aria-label="Go to landing page">
+              <span className="dashboard-nav-cloud-outline" aria-hidden="true">
+                <span className="dashboard-nav-cloud-bump dashboard-nav-cloud-bump-left" />
+                <span className="dashboard-nav-cloud-bump dashboard-nav-cloud-bump-center" />
+                <span className="dashboard-nav-cloud-bump dashboard-nav-cloud-bump-right" />
+                <span className="dashboard-nav-cloud-base" />
+              </span>
+              <span className="dashboard-wordmark-text">StratoSense</span>
             </Link>
+            <span className="subtitle">Atmospheric Analysis</span>
           </div>
         </div>
 
-        <div className="time-slider-wrap">
-          <span className="time-label">12 AM</span>
-          <div className="time-track">
-            <div
-              className="time-fill"
-              style={{ width: `${(timeOfDay / 86400) * 100}%` }}
-            />
-            <input
-              type="range"
-              min={0}
-              max={86400}
-              value={timeOfDay}
-              onChange={(e) => setTimeOfDay(Number(e.target.value))}
-              className="time-range"
-            />
-          </div>
-          <span className="time-label">12 AM+1</span>
-          <span className="time-current">{formatTimeOfDay(timeOfDay)}</span>
-          <button className="time-now-btn" onClick={() => setTimeOfDay(nowSeconds())}>
-            NOW
-          </button>
-        </div>
-
-        <div className={`status-dot ${online ? 'online' : 'offline'}`}>
-          {online
-            ? `Pipeline online — ${serverStatus.active_balloons} active`
-            : 'Pipeline offline'}
+        <div className="dashboard-status">
+          <span className="dashboard-status-text">
+            {online ? 'Pipeline online' : 'Pipeline offline'}
+          </span>
+          <span
+            className={`dashboard-status-pill ${online ? 'online' : 'offline'}`}
+            aria-hidden="true"
+          />
         </div>
       </header>
 
