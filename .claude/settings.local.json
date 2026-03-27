@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(node_modules/.bin/eslint src/components/AltitudeColumn.jsx src/components/FlightScrubber.jsx src/App.jsx --max-warnings=0)"
+    ]
+  }
+}
